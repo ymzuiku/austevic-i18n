@@ -1,38 +1,38 @@
 {
-	"name": "@austevic/i18n",
-	"version": "0.1.4",
-	"private": false,
-	"homepage": "https://github.com/ymzuiku/austevic-i18n",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/ymzuiku/austevic-i18n.git"
-	},
-	"files": [
-		"bin.ts",
-		"tsconfig.json"
-	],
-	"license": "MIT",
-	"description": "A i18n tool",
-	"author": "Zhu Liang",
-	"publisher": "Zhu Liang",
-	"module": "bin.ts",
-	"type": "module",
-	"scripts": {
-		"lint": "bunx biome format --write"
-	},
-	"bin": {
-		"@austevic/i18n": "bin.ts"
-	},
-	"devDependencies": {
-		"@types/bun": "latest",
-		"@types/minimist": "^1.2.5"
-	},
-	"peerDependencies": {
-		"typescript": "^5"
-	},
-	"dependencies": {
-		"@biomejs/biome": "^2.0.5",
-		"minimist": "^1.2.8",
-		"openai": "^5.8.2"
-	}
+  "name": "@austevic/i18n",
+  "version": "0.1.5",
+  "private": false,
+  "homepage": "https://github.com/ymzuiku/austevic-i18n",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ymzuiku/austevic-i18n.git"
+  },
+  "files": [
+    "bin.ts",
+    "tsconfig.json"
+  ],
+  "license": "MIT",
+  "description": "A i18n tool",
+  "author": "Zhu Liang",
+  "publisher": "Zhu Liang",
+  "module": "bin.ts",
+  "type": "module",
+  "scripts": {
+    "lint": "bunx biome format --write"
+  },
+  "bin": {
+    "@austevic/i18n": "bin.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/minimist": "^1.2.5"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@biomejs/biome": "^2.0.5",
+    "minimist": "^1.2.8",
+    "openai": "^5.8.2"
+  }
 }

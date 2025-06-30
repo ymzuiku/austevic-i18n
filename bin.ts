@@ -3,10 +3,84 @@
 import { Database } from "bun:sqlite";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { parseArgs } from "node:util";
 import OpenAI from "openai";
 
+if (!process.env.OPENAI_CLIENT) {
+	throw new Error("OPENAI_CLIENT is not set");
+}
+
+const {
+	values: { outdir, lang, prompt },
+} = parseArgs({
+	options: {
+		outdir: { type: "string", short: "o", default: "./i18n" },
+		lang: { type: "string", short: "l", default: "en,zh,ja,es,fr,hi" },
+		prompt: { type: "string", short: "p", default: "" },
+	},
+});
+
+if (!outdir) {
+	console.error(
+		"Please provide a output directory for the i18n, like: -o ./i18n",
+	);
+	process.exit(1);
+}
+
+const availableLanguages: Record<string, string> = {
+	en: "English",
+	zh: "中文",
+	ja: "日本語",
+	es: "Español",
+	fr: "Français",
+	hi: "Hindi",
+	de: "Deutsch",
+	ru: "Русский",
+	pt: "Português",
+	it: "Italiano",
+	ko: "한국어",
+	tr: "Türkçe",
+	vi: "Tiếng Việt",
+	th: "ไทย",
+	id: "Bahasa Indonesia",
+	ar: "العربية",
+	pl: "Polski",
+	nl: "Nederlands",
+	sv: "Svenska",
+	uk: "Українська",
+};
+
+const inputLangs = lang
+	.split(",")
+	.map((v) => v.trim())
+	.filter(Boolean);
+
+for (const code of inputLangs) {
+	if (!(code in availableLanguages)) {
+		throw new Error(`Unknown language code: "${code}"`);
+	}
+}
+
+const langsCode =
+	`const langs: Record<string, string> = {\n` +
+	inputLangs.map((code) => `\t${code}: "${code}",`).join("\n") +
+	`\n};`;
+
+const languageListCode =
+	`export const languageList = [\n` +
+	inputLangs
+		.map(
+			(code) => `\t{ value: "${code}", label: "${availableLanguages[code]}" },`,
+		)
+		.join("\n") +
+	`\n];`;
+
+console.log(
+	"will auto translate langs code to: ",
+	languageListCode.replace(/export const languageList = /, ""),
+);
+
 const tableName = "i18n";
-const outdir = "./i18n";
 const outfile = `${outdir}/i18n-source.ts`;
 const outIndexFile = `${outdir}/index.ts`;
 const typeRegx = /(\.(ts|tsx))/;
@@ -23,28 +97,17 @@ const ignoreDir = {
 	".idea": true,
 };
 
-fs.existsSync(outdir) || fs.mkdirSync(outdir);
+const addPrompt = prompt || process.env.I18N_AI_PROMPT || "";
+
+fs.existsSync(outdir) || fs.mkdirSync(outdir, { recursive: true });
 
 const i18nIndex = `
 import { i18nSource } from "./i18n-source";
 
 let lastLang = "";
-const langs: Record<string, string> = {
-	zh: "zh",
-	en: "en",
-	ja: "ja",
-	es: "es",
-	fr: "fr",
-	hi: "hi",
-};
-export const languageList = [
-	{ value: "en", label: "English" },
-	{ value: "zh", label: "中文" },
-	{ value: "ja", label: "日本語" },
-	{ value: "es", label: "Español" },
-	{ value: "hi", label: "Hindi" },
-	{ value: "fr", label: "Français" },
-];
+${langsCode}
+${languageListCode}
+
 const nofound = {
 	zh: " ",
 	en: " ",
@@ -160,7 +223,7 @@ export function replaceI18n(str: string, obj: Record<string, unknown>) {
 `;
 
 const aiPrompt = (text: string) => {
-	return `Translate the following text into English, Spanish, Chinese, French, Hindi, and Japanese. Ensure the translation is concise, professional, elegant, and suitable for a UI-friendly commercial context. Your output should be in JSON format: {"en": "Hello, {name}", "es": "Hola, {name}", "zh": "你好, {name}", "fr": "Bonjour, {name}", "hi": "नमस्ते, {name}", "ja": "こんにちは, {name}"} Please respond only in this JSON format. ${process.env.I18N_AI_PROMPT || ""} Please translate: ${text}`;
+	return `Translate the following text into English, Spanish, Chinese, French, Hindi, and Japanese. Ensure the translation is concise, professional, elegant, and suitable for a UI-friendly commercial context. Your output should be in JSON format: {"en": "Hello, {name}", "es": "Hola, {name}", "zh": "你好, {name}", "fr": "Bonjour, {name}", "hi": "नमस्ते, {name}", "ja": "こんにちは, {name}"} Please respond only in this JSON format. ${addPrompt} Please translate: ${text}`;
 };
 // 更好的处理gpt吐出的一些不规则的json对象
 function parseJsonText(jsonString: string) {
@@ -212,13 +275,14 @@ const matchI18n = (content: string): Set<string> => {
 		/i18nId(`[^`]+`)/g,
 		/i18nObj(`[^`]+`)/g,
 	];
-	// biome-ignore lint/complexity/noForEach: <explanation>
 	reg.forEach((r) => {
 		let match = null;
 		// biome-ignore lint/suspicious/noAssignInExpressions: <explanation>
 		while ((match = r.exec(content))) {
-			const key = match[1].slice(1, -1);
-			result.add(key);
+			const key = match[1]?.slice(1, -1);
+			if (key) {
+				result.add(key);
+			}
 		}
 	});
 	return result;
@@ -229,7 +293,7 @@ function findI18nTextInDirectory(dirPath: string, resultArray: string[]) {
 	const files = fs.readdirSync(dirPath);
 
 	for (let i = 0; i < files.length; i++) {
-		const file = files[i];
+		const file = files[i] as string;
 		if (ignoreDir[file as "node_modules"]) {
 			continue;
 		}
@@ -266,7 +330,7 @@ async function loadI18nTexts() {
 }
 
 async function start(texts: string[]) {
-	const db = new Database(`${process.cwd()}/i18n.sqlite`, { create: true });
+	const db = new Database(path.join(outdir, "i18n.sqlite"), { create: true });
 	await db
 		.query(
 			`
@@ -280,7 +344,7 @@ CREATE TABLE IF NOT Exists ${tableName} (
 
 	const out: Record<string, LanguageMap> = {};
 	for (let i = 0; i < texts.length; i++) {
-		const text = texts[i];
+		const text = texts[i] as string;
 		const old = (await db
 			.query(`select * from ${tableName} where k = $text`)
 			.get({ $text: text })) as {
@@ -294,7 +358,7 @@ CREATE TABLE IF NOT Exists ${tableName} (
 				messages: [{ role: "user", content: aiPrompt(text) }],
 				model: "gpt-4o-mini",
 			});
-			const msg = completion.choices[0].message.content;
+			const msg = completion.choices[0]?.message.content;
 			try {
 				if (!msg) {
 					console.log("openai error, not msg:", text, msg);
@@ -318,7 +382,10 @@ CREATE TABLE IF NOT Exists ${tableName} (
 }
 
 async function pipe() {
-	const texts = await loadI18nTexts();
+	let texts = await loadI18nTexts();
+	if (texts.length === 0) {
+		texts = ["hello"];
+	}
 	const out = await start(texts);
 	fs.writeFileSync(
 		outfile,
