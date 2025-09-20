@@ -1,6 +1,6 @@
 {
   "name": "@austevic/i18n",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": false,
   "homepage": "https://github.com/ymzuiku/austevic-i18n",
   "repository": {
@@ -33,6 +33,6 @@
   "dependencies": {
     "@biomejs/biome": "^2.0.5",
     "minimist": "^1.2.8",
-    "openai": "^5.8.2"
+    "openai": "^5.22.0"
   }
 }
